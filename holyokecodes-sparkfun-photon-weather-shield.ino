@@ -18,6 +18,7 @@
   Meters to test your connections.
 
   Weather data will be uploaded to Wunderground Personal Weather Station
+  http://wiki.wunderground.com/index.php/PWS_-_Upload_Protocol
   
 *******************************************************************************/
 #include "SparkFun_Photon_Weather_Shield_Library.h"
@@ -40,7 +41,7 @@ int WSPEED = D3;
 // Run I2C Scanner to get address of DS18B20(s)
 // (found in the Firmware folder in the Photon Weather Shield Repo)
 /***********REPLACE THIS ADDRESS WITH YOUR ADDRESS*************/
-DeviceAddress inSoilThermometer = {0x28, 0x6F, 0xD1, 0x5E, 0x06, 0x00, 0x00, 0x76}; // Waterproof temp sensor address
+DeviceAddress inSoilThermometer = {0x28, 0x2D, 0x7, 0x79, 0x1E, 0x13, 0x1, 0xD1}; // Waterproof temp sensor address
 /***********REPLACE THIS ADDRESS WITH YOUR ADDRESS*************/
 
 //Global Variables
@@ -79,13 +80,13 @@ long lastWindCheck = 0;
 volatile float dailyrainin = 0; // [rain inches so far today in local time]
 
 float humidity = 0;
-float tempf = 0;
+double tempf = 0;
 float tempc = 0;
 double InTempC = 0;//original temperature in C from DS18B20
-float soiltempf = 0;//converted temperature in F from DS18B20
+double soiltempf = 0;//converted temperature in F from DS18B20
 float pascals = 0;
 //float altf = 0;//uncomment this if using altitude mode instead
-float baroTempF = 0; //barometer sensor temp reading, fahrenheit
+double baroTempF = 0; //barometer sensor temp reading, fahrenheit
 float baroTempC = 0; //barometer sensor temp reading, celsius
 int soilMoisture = 0;
 float dewptF = 0;
@@ -144,9 +145,10 @@ void wspeedIRQ()
 //---------------------------------------------------------------
 void setup()
 {
+    Time.zone(-5);
     // DS18B20 initialization
     sensors.begin();
-    //sensors.setResolution(inSoilThermometer, TEMPERATURE_PRECISION);
+    sensors.setResolution(inSoilThermometer, TEMPERATURE_PRECISION);
 
     pinMode(WSPEED, INPUT_PULLUP); // input from wind meters windspeed sensor
     pinMode(RAIN, INPUT_PULLUP); // input from wind meters rain gauge sensor
@@ -268,13 +270,29 @@ void sendToWU()
     client.print(PASSWORD);
     client.print("&dateutc=now");      // can use 'now' instead of time if sending in real time
     client.print("&tempf=");
-    client.print(tempf);
+    client.print(soiltempf);
     client.print("&dewptf=");
     client.print(dewptF);
     client.print("&humidity=");
     client.print(humidity);
     client.print("&baromin=");
     client.print(inches);
+    client.print("&windspeedmph=");
+    client.print(windspeedmph);
+    client.print("&winddir=");
+    client.print(winddir);
+    client.print("&windspdmph_avg2m=");
+    client.print(windspdmph_avg2m);
+    client.print("&winddir_avg2m=");
+    client.print(winddir_avg2m);
+    client.print("&windgustmph_10m=");
+    client.print(windgustmph_10m);
+    client.print("&windgustdir_10m=");
+    client.print(windgustdir_10m);
+    client.print("&rainin=");
+    client.print(rainin);
+    client.print("&dailyrainin=");
+    client.print(dailyrainin);
     //client.print("&action=updateraw");    // Standard update rate - for sending once a minute or less
     client.print("&softwaretype=Particle-Photon&action=updateraw&realtime=1&rtfreq=10");  // Rapid Fire update rate - for sending multiple times per minute, specify frequency in seconds
     client.print(" HTTP/1.0\r\n");
@@ -299,25 +317,25 @@ void printInfo()
         case 0:
           Serial.print("North");
           break;
-        case 1:
+        case 45:
           Serial.print("NE");
           break;
-        case 2:
+        case 90:
           Serial.print("East");
           break;
-        case 3:
+        case 135:
           Serial.print("SE");
           break;
-        case 4:
+        case 180:
           Serial.print("South");
           break;
-        case 5:
+        case 225:
           Serial.print("SW");
           break;
-        case 6:
+        case 270:
           Serial.print("West");
           break;
-        case 7:
+        case 315:
           Serial.print("NW");
           break;
         default:
@@ -331,12 +349,13 @@ void printInfo()
       Serial.print("mph, ");
 
       Serial.print("Rain:");
-https://build.particle.io/build/5b8dc841d40e9586dc00064d#flash      Serial.print(rainin, 2);
+      Serial.print(rainin, 2);
       Serial.print("in., ");
 
       Serial.print("Temp:");
       Serial.print(tempf);
       Serial.print("F, ");
+      Particle.variable("temp", tempf);
 
       Serial.print("Humidity:");
       Serial.print(humidity);
@@ -345,7 +364,8 @@ https://build.particle.io/build/5b8dc841d40e9586dc00064d#flash      Serial.print
       Serial.print("Baro_Temp:");
       Serial.print(baroTempF);
       Serial.print("F, ");
-
+      Particle.variable("baroTempF", baroTempF);
+    
       Serial.print("Pressure:");
       Serial.print(pascals/100);
       Serial.print("hPa, ");
@@ -362,9 +382,10 @@ https://build.particle.io/build/5b8dc841d40e9586dc00064d#flash      Serial.print
       //Serial.print(altf);
       //Serial.println("ft.");
 
-      //Serial.print("Soil_Temp:");
-      //Serial.print(soiltempf);
-      //Serial.print("F, ");
+      Serial.print("Soil_Temp:");
+      Serial.print(soiltempf);
+      Serial.print("F, ");
+      Particle.variable("SoilTemp", soiltempf);
 
       //Serial.print("Soil_Mositure:");
       //Serial.println(soilMoisture);//Mositure Content is expressed as an analog
@@ -380,9 +401,9 @@ void getSoilTemp()
     update18B20Temp(inSoilThermometer, InTempC);
     //Every so often there is an error that throws a -127.00, this compensates
     if(InTempC < -100)
-      soiltempf = soiltempf;//push last value so data isn't out of scope
+      soiltempf = soiltempf; //push last value so data isn't out of scope
     else
-      soiltempf = (InTempC * 9)/5 + 32;//else grab the newest, good data
+      soiltempf = (InTempC * 9)/5 + 32; //else grab the newest, good data
 }
 //---------------------------------------------------------------
 void getSoilMositure()
@@ -420,14 +441,14 @@ int get_wind_direction()
   //it is recomended that you AnalogRead the Wind Vain to make sure the values
   //your wind vain output fall within the values listed below.
   if(adc > 2270 && adc < 2290) return (0);//North
-  if(adc > 3220 && adc < 3299) return (1);//NE
-  if(adc > 3890 && adc < 3999) return (2);//East
-  if(adc > 3780 && adc < 3850) return (3);//SE
+  if(adc > 3220 && adc < 3299) return (45);//NE
+  if(adc > 3890 && adc < 3999) return (90);//East
+  if(adc > 3780 && adc < 3850) return (135);//SE
 
-  if(adc > 3570 && adc < 3650) return (4);//South
-  if(adc > 2790 && adc < 2850) return (5);//SW
-  if(adc > 1580 && adc < 1610) return (6);//West
-  if(adc > 1930 && adc < 1950) return (7);//NW
+  if(adc > 3570 && adc < 3650) return (180);//South
+  if(adc > 2790 && adc < 2850) return (225);//SW
+  if(adc > 1580 && adc < 1610) return (270);//West
+  if(adc > 1930 && adc < 1950) return (315);//NW
 
   return (-1); // error, disconnected?
 }
@@ -459,6 +480,9 @@ float get_wind_speed()
 //---------------------------------------------------------------
 double dewPoint(double celsius, double humidity)
 {
+	// Every so often there is an error that throws a -127.00, this compensates
+  if(InTempC < -100) return dewptC;
+    
 	// (1) Saturation Vapor Pressure = ESGG(T)
 	double RATIO = 373.15 / (273.15 + celsius);
 	double RHS = -7.90298 * (RATIO - 1);
@@ -467,11 +491,12 @@ double dewPoint(double celsius, double humidity)
 	RHS += 8.1328e-3 * (pow(10, (-3.49149 * (RATIO - 1))) - 1) ;
 	RHS += log10(1013.246);
 
-  // factor -3 is to adjust units - Vapor Pressure SVP * humidity
+    // factor -3 is to adjust units - Vapor Pressure SVP * humidity
 	double VP = pow(10, RHS - 3) * humidity;
 
-  // (2) DEWPOINT = F(Vapor Pressure)
+    // (2) DEWPOINT = F(Vapor Pressure)
 	double T = log(VP/0.61078);   // temp var
+
 	return (241.88 * T) / (17.558 - T);
 }
 //---------------------------------------------------------------
@@ -502,7 +527,7 @@ void getWeather()
     //If in altitude mode, you can get a reading in feet  with this line:
     //altf = sensor.readAltitudeFt();
 
-    //getSoilTemp();//Read the DS18B20 waterproof temp sensor
+    getSoilTemp();//Read the DS18B20 waterproof temp sensor
     //getSoilMositure();//Read the soil moisture sensor
 
     //Calc winddir
@@ -553,6 +578,6 @@ void getWeather()
       rainin += rainHour[i];
       
     //Calculate Dew Point
-    dewptC = dewPoint(tempc, humidity);
+    dewptC = dewPoint(InTempC, humidity);
     dewptF = (dewptC * 9.0)/ 5.0 + 32.0;
 }
