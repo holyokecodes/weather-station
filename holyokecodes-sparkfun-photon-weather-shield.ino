@@ -109,7 +109,7 @@ char SERVER[] = "rtupdate.wunderground.com";      	    // Rapidfire update serve
 char WEBPAGE [] = "GET /weatherstation/updateweatherstation.php?";
 // Station Identification
 char ID [] = "KMAHOLYO17"; // Your station ID here
-char PASSWORD [] = "mdo1uxsv"; // Your Weather Underground password here
+char PASSWORD [] = "XXXXXXX"; // Your Weather Underground password here
 TCPClient client;
 
 void update18B20Temp(DeviceAddress deviceAddress, double &tempC);//predeclare to compile
